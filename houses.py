@@ -12,6 +12,6 @@ from houses_utils import parse_immobilier_url_without_selenium, parse_immobilier
 
 from houses_urls import URL_rent_geneva_immobilier
 
-parse_immobilier_url_with_selenium(URL_rent_geneva_immobilier)
+soup_output = parse_immobilier_url_with_selenium(URL_rent_geneva_immobilier)
 
 print("Finished script")

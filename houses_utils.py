@@ -1,13 +1,20 @@
 import requests
 from bs4 import BeautifulSoup as bs
 from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import Select
 import datetime
 
 
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup as bs
 
 def parse_immobilier_url_with_selenium(URL_rent_geneva_immobilier):
     """
@@ -15,10 +22,11 @@ def parse_immobilier_url_with_selenium(URL_rent_geneva_immobilier):
     """
     # instantiate a Chrome options object. I can't just use the requests library because immobilier blocks it.
     # I understand that they don't want people scraping their website.
-    options = webdriver.ChromeOptions()
+    options = Options()
     
     # set the options to use Chrome in headless mode
     options.add_argument("--headless=new")
+    options.add_argument('--disable-notifications')
     
     # initialize an instance of the Chrome driver (browser) in headless mode
     driver = webdriver.Chrome(options=options)
@@ -26,35 +34,75 @@ def parse_immobilier_url_with_selenium(URL_rent_geneva_immobilier):
     # visit immobilier and get the page. 
     driver.get(URL_rent_geneva_immobilier)
 
-    min_price_field = driver.find_element("id", "min-price-range")
-    select = Select(min_price_field)
-    select.select_by_visible_text("2600")
+    # Wait for the input field to be visible and interactable
+    wait = WebDriverWait(driver, 20)
 
-    # I need to click in certain fields to select my criteria, otherwise there are no apartments selected.
+    try:
+        # Retry mechanism for the cookie consent dialog
+        retries = 3
+        for attempt in range(retries):
+            try:
+                cookie_consent_button = wait.until(EC.element_to_be_clickable((By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll")))
+                cookie_consent_button.click()
+                # Wait for the cookie consent dialog to disappear
+                wait.until(EC.invisibility_of_element_located((By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll")))
+                print("Cookie consent banner closed successfully.")
+                break
+
+            except Exception as e:
+                print(f"Attempt {attempt + 1} to close cookie consent banner failed: {e}")
+
+                if attempt < retries - 1:
+                    driver.refresh()
+
+                else:
+                    raise Exception("Failed to close cookie consent banner after 3 attempts.")
 
 
+        print("Passed the banner clicking")
+        
+        # Ensure the cookie consent dialog is closed
+        wait.until(EC.invisibility_of_element_located((By.ID, "CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll")))
 
-    # Then send it to beautiful soup for ease of parsing.
-    soup = bs(driver.page_source, "html.parser")
-    
-    # release the resources allocated by Selenium and shut down the browser
-    driver.quit()
+        # Wait for the price dropdown button to be clickable and click it to open the dropdown
+        price_button = wait.until(EC.element_to_be_clickable((By.ID, "priceLabel")))
+        print("dropdown is visible")
+        
+        # Scroll to the button to ensure it is within the viewport
+        driver.execute_script("arguments[0].scrollIntoView();", price_button)
+        
+        # Retry clicking the button if intercepted
+        retries = 3
+        for attempt in range(retries):
 
-    soup_str = str(soup.prettify())
-    with open("immobilier.html", "w", encoding = "utf-8") as file:
-        file.write(soup_str)
+            try:
+                price_button.click()
+                print("Price dropdown button clicked successfully.")
+                break
 
-    elements = soup.find_all("div", {"class": "filter-item-container"})
-    print(f"Found {len(elements)} elements with class 'filter-item-container'")
+            except Exception as e:
+                print(f"Attempt {attempt + 1} to click price dropdown button failed: {e}")
+                wait.until(EC.element_to_be_clickable((By.ID, "priceLabel")))
 
-    for i, element in enumerate(elements):
-        print(f"Element {i}: {element}")
+        # Wait for the dropdown menu to become visible
+        dropdown_menu = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "dropdown__menu")))
+        
+        # Locate the list item with the value 2600 and click it
+        min_price_option = dropdown_menu.find_element(By.XPATH, "//li[@data-range-min-value='2600']")
+        min_price_option.click()
+        print("Minimum price option 2600 clicked successfully.")
 
-    href_values = [element.find('a').get("href") for element in elements if element.find('a')]
+        # I need to click in certain fields to select my criteria, otherwise there are no apartments selected.
 
-    print(href_values)
-    
-    return soup
+        # Then send it to beautiful soup for ease of parsing.
+        soup = bs(driver.page_source, "html.parser")
+        return soup
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        # Close the browser
+        driver.quit()
 
 def parse_immobilier_url_without_selenium(URL_of_website):
 
