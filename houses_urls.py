@@ -1,0 +1,1 @@
+URL_rent_geneva_immobilier = "https://www.immobilier.ch/fr/carte/louer/appartement-maison/page-1?t=rent&c=1;2&p=c10377;c10378;c10379;c10380;c9649;c9159;c10449;c9694;c13268&px=4800&nrn=3&nrx=8&nb=false"
